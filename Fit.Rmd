@@ -17,10 +17,10 @@ registerDoMC(cores = 4)
 ```
 
 ## Executive summary
-In this report, we describe the training of a random forest-based classifier for classifying barbell exercise executions in 5 quality classes. Our classifier is shown to achieve high accuracy. 
+In this report, we describe the training of a random forest-based classifier for classifying barbell exercise executions in 5 quality classes based on sensor data obtained from [http://groupware.les.inf.puc-rio.br/har](http://groupware.les.inf.puc-rio.br/har). Our classifier is shown to achieve very high out-of-sample accuracy. 
 
 ## Data processing
-We load the data, properly encoding N/A values and converting the quality class, which is to be predicted, to a factor. 
+We load the data, properly encoding NA values and converting the quality class, which is to be predicted, to a factor. 
 ```{r}
 train <- read.csv("pml-training.csv", na.strings = c("", "#DIV!0", NA))
 test <- read.csv("pml-testing.csv", na.strings = c("", "#DIV!0", NA))
@@ -48,21 +48,20 @@ train <- train[,-(1:6)]
 test <- test[,-(1:6)]
 ```
 
-Although the caret package will be able to estimate out-of-sample accuracy, we will split the training data to obtain an additional test set for determining the out-of-sample accuracy ourselves:
+Although the caret package will be able to estimate out-of-sample accuracy, we will split the training data to obtain an additional test set for determining the out-of-sample accuracy. We partition by `classe` so test cases are distributed among the 5 quality classes are created.
 
 ```{r}
-# Estimate OO error by partitioning off a testing set from training set
-# Partition by classe so test cases for all classes are created
 in.train <- createDataPartition(train$classe, p=.60, list=FALSE)
 t.train <- train[in.train[,1],]
 t.test <- train[-in.train[,1],]
 ```
 
 ## Classifier training and performance
-We opt for a random forest model as the dataset contains a large number of variables, and because such models can be highly accurate overall. We rely on the caret's package defaults for the other parameters, and investigate whether we get good results from those defaults before tuning. 
+We opt for a random forest model as the dataset contains a large number of variables, and because such models can deliver high accuracy overall. We use repeated 10-fold cross validation, with 3 iterations, to assess the accuracy of the resulting model.  We rely on the caret's package defaults for the other parameters, and investigate whether we get good results from those defaults before tuning. 
 ```{r, cache = TRUE}
 #Build model
-rf_model <- train(y = t.train$classe, x = dplyr::select(t.train, -classe), method="rf")
+train_control <- trainControl(method="repeatedcv", number=10, repeats=3)
+rf_model <- train(y = t.train$classe, trControl = train_control, x = dplyr::select(t.train, -classe), method="rf")
 rf_model
 ```
 
@@ -79,7 +78,7 @@ Let's see how it generalizes by looking at the performance on our test set:
 predictions <- predict(rf_model, t.test)
 confusionMatrix(predictions, t.test[, "classe"])
 ```
-Accuracy is 0.9918 so our out-of-sample error estimate is `r 1- 0.9918`. Which is high enough for our purposes. 
+Accuracy is 0.9913 so our out-of-sample error estimate is `r 1- 0.9913`. Which is high enough for our purposes. 
 
 Finally lets investigate the importance of the predictors
 ```{r, echo = FALSE}
@@ -92,9 +91,9 @@ It seems roll and yaw sensor data from the lumbar belt were especially important
 Given the high accuracy attained by the random forest, we are interested in comparing its performance to a less computationally intensive technique such as linear discriminant analysis. 
 
 ```{r} 
-glm_model <- train(y = t.train$classe, x = dplyr::select(t.train,-classe), method="lda")
-predictions <- predict(glm_model, dplyr::select(t.test,-classe))
-confusionMatrix(predictions, t.test[, "classe"])
+lda_model <- train(y = t.train$classe, x = dplyr::select(t.train,-classe), method="lda")
+lda_predictions <- predict(lda_model, dplyr::select(t.test,-classe))
+confusionMatrix(lda_predictions, t.test[, "classe"])
 ```
 
 Interestingly, accuracy is significantly lower (70%) for LDA.

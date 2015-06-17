@@ -66,11 +66,11 @@ img {
 
 <div id="executive-summary" class="section level2">
 <h2>Executive summary</h2>
-<p>In this report, we describe the training of a random forest-based classifier for classifying barbell exercise executions in 5 quality classes. Our classifier is shown to achieve high accuracy.</p>
+<p>In this report, we describe the training of a random forest-based classifier for classifying barbell exercise executions in 5 quality classes based on sensor data obtained from <a href="http://groupware.les.inf.puc-rio.br/har"><a href="http://groupware.les.inf.puc-rio.br/har" class="uri">http://groupware.les.inf.puc-rio.br/har</a></a>. Our classifier is shown to achieve very high out-of-sample accuracy.</p>
 </div>
 <div id="data-processing" class="section level2">
 <h2>Data processing</h2>
-<p>We load the data, properly encoding N/A values and converting the quality class, which is to be predicted, to a factor.</p>
+<p>We load the data, properly encoding NA values and converting the quality class, which is to be predicted, to a factor.</p>
 <pre class="r"><code>train &lt;- read.csv(&quot;pml-training.csv&quot;, na.strings = c(&quot;&quot;, &quot;#DIV!0&quot;, NA))
 test &lt;- read.csv(&quot;pml-testing.csv&quot;, na.strings = c(&quot;&quot;, &quot;#DIV!0&quot;, NA))
 train$classe &lt;- as.factor(train$classe)</code></pre>
@@ -88,18 +88,17 @@ train &lt;- dplyr::select(train, -nsv)
 
 train &lt;- train[,-(1:6)]
 test &lt;- test[,-(1:6)]</code></pre>
-<p>Although the caret package will be able to estimate out-of-sample accuracy, we will split the training data to obtain an additional test set for determining the out-of-sample accuracy ourselves:</p>
-<pre class="r"><code># Estimate OO error by partitioning off a testing set from training set
-# Partition by classe so test cases for all classes are created
-in.train &lt;- createDataPartition(train$classe, p=.60, list=FALSE)
+<p>Although the caret package will be able to estimate out-of-sample accuracy, we will split the training data to obtain an additional test set for determining the out-of-sample accuracy. We partition by <code>classe</code> so test cases are distributed among the 5 quality classes are created.</p>
+<pre class="r"><code>in.train &lt;- createDataPartition(train$classe, p=.60, list=FALSE)
 t.train &lt;- train[in.train[,1],]
 t.test &lt;- train[-in.train[,1],]</code></pre>
 </div>
 <div id="classifier-training-and-performance" class="section level2">
 <h2>Classifier training and performance</h2>
-<p>We opt for a random forest model as the dataset contains a large number of variables, and because such models can be highly accurate overall. We rely on the caret’s package defaults for the other parameters, and investigate whether we get good results from those defaults before tuning.</p>
+<p>We opt for a random forest model as the dataset contains a large number of variables, and because such models can deliver high accuracy overall. We use repeated 10-fold cross validation, with 3 iterations, to assess the accuracy of the resulting model. We rely on the caret’s package defaults for the other parameters, and investigate whether we get good results from those defaults before tuning.</p>
 <pre class="r"><code>#Build model
-rf_model &lt;- train(y = t.train$classe, x = dplyr::select(t.train, -classe), method=&quot;rf&quot;)
+train_control &lt;- trainControl(method=&quot;repeatedcv&quot;, number=10, repeats=3)
+rf_model &lt;- train(y = t.train$classe, trControl = train_control, x = dplyr::select(t.train, -classe), method=&quot;rf&quot;)
 rf_model</code></pre>
 <pre><code>## Random Forest 
 ## 
@@ -108,16 +107,16 @@ rf_model</code></pre>
 ##     5 classes: 'A', 'B', 'C', 'D', 'E' 
 ## 
 ## No pre-processing
-## Resampling: Bootstrapped (25 reps) 
+## Resampling: Cross-Validated (10 fold, repeated 3 times) 
 ## 
-## Summary of sample sizes: 11776, 11776, 11776, 11776, 11776, 11776, ... 
+## Summary of sample sizes: 10599, 10599, 10597, 10598, 10599, 10599, ... 
 ## 
 ## Resampling results across tuning parameters:
 ## 
 ##   mtry  Accuracy   Kappa      Accuracy SD  Kappa SD   
-##    2    0.9863030  0.9826689  0.002285447  0.002901503
-##   27    0.9856605  0.9818571  0.002200054  0.002788809
-##   52    0.9770601  0.9709755  0.005100631  0.006463770
+##    2    0.9900644  0.9874303  0.002822132  0.003570464
+##   27    0.9896970  0.9869661  0.003110078  0.003934581
+##   52    0.9847148  0.9806630  0.005737067  0.007257167
 ## 
 ## Accuracy was used to select the optimal model using  the largest value.
 ## The final value used for the model was mtry = 2.</code></pre>
@@ -163,68 +162,68 @@ confusionMatrix(predictions, t.test[, &quot;classe&quot;])</code></pre>
 ## 
 ##           Reference
 ## Prediction    A    B    C    D    E
-##          A 2232   10    0    0    0
-##          B    0 1506   13    0    0
-##          C    0    2 1350   28    2
-##          D    0    0    5 1256    2
-##          E    0    0    0    2 1438
+##          A 2232   11    0    0    0
+##          B    0 1505   16    0    0
+##          C    0    2 1348   28    3
+##          D    0    0    4 1256    2
+##          E    0    0    0    2 1437
 ## 
 ## Overall Statistics
-##                                           
-##                Accuracy : 0.9918          
-##                  95% CI : (0.9896, 0.9937)
-##     No Information Rate : 0.2845          
-##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
-##                                           
-##                   Kappa : 0.9897          
-##  Mcnemar's Test P-Value : NA              
+##                                          
+##                Accuracy : 0.9913         
+##                  95% CI : (0.989, 0.9933)
+##     No Information Rate : 0.2845         
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16      
+##                                          
+##                   Kappa : 0.989          
+##  Mcnemar's Test P-Value : NA             
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: A Class: B Class: C Class: D Class: E
-## Sensitivity            1.0000   0.9921   0.9868   0.9767   0.9972
-## Specificity            0.9982   0.9979   0.9951   0.9989   0.9997
-## Pos Pred Value         0.9955   0.9914   0.9768   0.9945   0.9986
-## Neg Pred Value         1.0000   0.9981   0.9972   0.9954   0.9994
+## Sensitivity            1.0000   0.9914   0.9854   0.9767   0.9965
+## Specificity            0.9980   0.9975   0.9949   0.9991   0.9997
+## Pos Pred Value         0.9951   0.9895   0.9761   0.9952   0.9986
+## Neg Pred Value         1.0000   0.9979   0.9969   0.9954   0.9992
 ## Prevalence             0.2845   0.1935   0.1744   0.1639   0.1838
-## Detection Rate         0.2845   0.1919   0.1721   0.1601   0.1833
-## Detection Prevalence   0.2858   0.1936   0.1761   0.1610   0.1835
-## Balanced Accuracy      0.9991   0.9950   0.9910   0.9878   0.9985</code></pre>
-<p>Accuracy is 0.9918 so our out-of-sample error estimate is 0.0082. Which is high enough for our purposes.</p>
+## Detection Rate         0.2845   0.1918   0.1718   0.1601   0.1832
+## Detection Prevalence   0.2859   0.1939   0.1760   0.1608   0.1834
+## Balanced Accuracy      0.9990   0.9945   0.9901   0.9879   0.9981</code></pre>
+<p>Accuracy is 0.9913 so our out-of-sample error estimate is 0.0087. Which is high enough for our purposes.</p>
 <p>Finally lets investigate the importance of the predictors</p>
 <pre><code>## rf variable importance
 ## 
 ##   only 20 most important variables shown (out of 52)
 ## 
-##                   Overall
-## roll_belt          100.00
-## yaw_belt            83.16
-## magnet_dumbbell_z   69.06
-## magnet_dumbbell_y   63.94
-## pitch_belt          63.67
-## pitch_forearm       57.06
-## magnet_dumbbell_x   54.68
-## roll_forearm        50.60
-## accel_dumbbell_y    47.52
-## accel_belt_z        46.81
-## magnet_belt_z       43.71
-## magnet_belt_y       43.56
-## roll_dumbbell       42.60
-## accel_dumbbell_z    40.71
-## roll_arm            34.82
-## accel_forearm_x     33.05
-## yaw_dumbbell        30.67
-## accel_dumbbell_x    30.32
-## gyros_belt_z        28.64
-## accel_arm_x         28.48</code></pre>
+##                      Overall
+## roll_belt             100.00
+## yaw_belt               73.84
+## magnet_dumbbell_z      65.20
+## magnet_dumbbell_y      59.32
+## pitch_belt             56.91
+## pitch_forearm          56.10
+## magnet_dumbbell_x      52.16
+## roll_forearm           48.53
+## accel_belt_z           42.81
+## roll_dumbbell          42.09
+## accel_dumbbell_y       41.72
+## magnet_belt_y          41.65
+## magnet_belt_z          39.34
+## roll_arm               35.20
+## accel_dumbbell_z       34.63
+## accel_forearm_x        31.38
+## yaw_dumbbell           29.98
+## gyros_belt_z           28.17
+## gyros_dumbbell_y       27.59
+## total_accel_dumbbell   27.04</code></pre>
 <p>It seems roll and yaw sensor data from the lumbar belt were especially important in assessing the quality of the exercises.</p>
 </div>
 <div id="lda-model" class="section level2">
 <h2>LDA model</h2>
 <p>Given the high accuracy attained by the random forest, we are interested in comparing its performance to a less computationally intensive technique such as linear discriminant analysis.</p>
-<pre class="r"><code>glm_model &lt;- train(y = t.train$classe, x = dplyr::select(t.train,-classe), method=&quot;lda&quot;)
-predictions &lt;- predict(glm_model, dplyr::select(t.test,-classe))
-confusionMatrix(predictions, t.test[, &quot;classe&quot;])</code></pre>
+<pre class="r"><code>lda_model &lt;- train(y = t.train$classe, x = dplyr::select(t.train,-classe), method=&quot;lda&quot;)
+lda_predictions &lt;- predict(lda_model, dplyr::select(t.test,-classe))
+confusionMatrix(lda_predictions, t.test[, &quot;classe&quot;])</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
 ##           Reference
